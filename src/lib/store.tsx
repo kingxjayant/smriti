@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Card, newCard, review as srsReview, isDue } from './srs';
+import { Card, newCard, review as srsReview, isDue, type Grade } from './srs';
 import { SEED_DECKS } from './seed';
 import { Language } from './i18n';
 
@@ -31,7 +31,7 @@ type State = {
 
 type Ctx = State & {
   dueCards: (deckId?: string) => Card[];
-  rate: (id: string, r: 0 | 1 | 2 | 3) => void;
+  rate: (id: string, r: Grade) => void;
   addDeck: (name: string, subject: string, exam: string) => string;
   addCard: (deckId: string, front: string, back: string, topic?: string) => void;
   deleteDeck: (id: string) => void;
@@ -118,7 +118,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               streak,
               lastStudy: t,
               totalReviews: p.stats.totalReviews + 1,
-              xp: p.stats.xp + (r === 0 ? 2 : r === 3 ? 12 : 8),
+              xp: p.stats.xp + (r === 'forgot' ? 2 : r === 'mastered' ? 12 : 8),
             },
           };
         }),

@@ -4,13 +4,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useStore, FREE_DAILY_LIMIT } from '../src/lib/store';
 import { T } from '../src/lib/theme';
+import { Grade } from '../src/lib/srs';
 import { Btn, Bar } from '../src/components/UI';
 
-const RATINGS: { r: 0 | 1 | 2 | 3; label: string; hint: string; color: string }[] = [
-  { r: 0, label: 'Again', hint: '5m', color: T.bad },
-  { r: 1, label: 'Hard', hint: '', color: T.warn },
-  { r: 2, label: 'Good', hint: '', color: T.accent2 },
-  { r: 3, label: 'Easy', hint: '', color: T.good },
+const GRADES: { grade: Grade; label: string; hint: string; color: string }[] = [
+  { grade: 'forgot', label: 'Forgot', hint: 'reset · 1 day', color: T.bad },
+  { grade: 'struggled', label: 'Struggled', hint: 'review soon', color: T.warn },
+  { grade: 'mastered', label: 'Mastered', hint: 'boosted', color: T.good },
 ];
 
 export default function Review() {
@@ -37,12 +37,12 @@ export default function Review() {
 
   const limited = !st.isPro && done >= FREE_DAILY_LIMIT;
 
-  function rate(r: 0 | 1 | 2 | 3) {
+  function rate(g: Grade) {
     Animated.sequence([
       Animated.timing(slide, { toValue: 1, duration: 150, useNativeDriver: true }),
       Animated.timing(slide, { toValue: 0, duration: 0, useNativeDriver: true }),
     ]).start();
-    st.rate(card.id, r);
+    st.rate(card.id, g);
     setDone((d) => d + 1);
     setFlipped(false);
   }
@@ -131,18 +131,19 @@ export default function Review() {
       <View style={{ height: 16 }} />
 
       {flipped ? (
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          {RATINGS.map((x) => (
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          {GRADES.map((x) => (
             <Pressable
-              key={x.r}
-              onPress={() => rate(x.r)}
+              key={x.grade}
+              onPress={() => rate(x.grade)}
               style={({ pressed }) => [
                 s.rate,
-                { borderColor: x.color + '77', backgroundColor: x.color + '18' },
-                pressed && { backgroundColor: x.color + '33' },
+                { borderColor: x.color + '66', backgroundColor: x.color + '16' },
+                pressed && { backgroundColor: x.color + '30', transform: [{ scale: 0.97 }] },
               ]}
             >
-              <Text style={{ color: x.color, fontWeight: '800', fontSize: 14 }}>{x.label}</Text>
+              <Text style={{ color: x.color, fontWeight: '800', fontSize: 15 }}>{x.label}</Text>
+              <Text style={[s.rateHint, { color: x.color + 'C0' }]}>{x.hint}</Text>
             </Pressable>
           ))}
         </View>
@@ -179,7 +180,15 @@ const s = StyleSheet.create({
   q: { color: T.text, fontSize: 23, fontWeight: '700', textAlign: 'center', lineHeight: 32 },
   a: { color: T.text, fontSize: 17.5, textAlign: 'center', lineHeight: 27 },
   tapHint: { color: T.dim, fontSize: 11.5, textAlign: 'center', marginTop: 12 },
-  rate: { flex: 1, paddingVertical: 16, borderRadius: 15, borderWidth: 1, alignItems: 'center' },
+  rate: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    gap: 3,
+  },
+  rateHint: { fontSize: 11, fontWeight: '600', opacity: 0.9 },
   bigTitle: { color: T.text, fontSize: 24, fontWeight: '800', textAlign: 'center' },
   body: { color: T.sub, fontSize: 14.5, textAlign: 'center', lineHeight: 22, marginBottom: 8 },
 });

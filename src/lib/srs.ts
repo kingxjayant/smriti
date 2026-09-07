@@ -1,7 +1,13 @@
 /**
  * Smriti SRS engine — a compact SM-2 variant tuned for exam cramming.
- * Rating: 0 = Again, 1 = Hard, 2 = Good, 3 = Easy
+ *
+ * Review outcomes are intentionally simple (three, not Anki's four):
+ *   - 'forgot'     → interval reset to 1 day
+ *   - 'struggled'  → moderate interval multiplier
+ *   - 'mastered'   → full retention boost
  */
+
+export type Grade = 'forgot' | 'struggled' | 'mastered';
 
 export type Card = {
   id: string;
@@ -36,24 +42,35 @@ export function newCard(deckId: string, front: string, back: string, topic?: str
   };
 }
 
-export function review(card: Card, rating: 0 | 1 | 2 | 3, now = Date.now()): Card {
+export function review(card: Card, grade: Grade, now = Date.now()): Card {
   let { ease, interval, reps, lapses } = card;
 
-  if (rating === 0) {
+  // Forgot — reset the interval to a single day and let the card cool down.
+  if (grade === 'forgot') {
     lapses += 1;
     reps = 0;
     ease = Math.max(1.3, ease - 0.2);
-    interval = 0;
-    return { ...card, ease, interval, reps, lapses, due: now + 60000 * 5 };
+    interval = 1;
+    return { ...card, ease, interval, reps, lapses, due: now + interval * DAY };
   }
 
-  if (rating === 1) ease = Math.max(1.3, ease - 0.15);
-  if (rating === 3) ease = Math.min(3.0, ease + 0.15);
-
   reps += 1;
-  if (reps === 1) interval = rating === 3 ? 3 : 1;
-  else if (reps === 2) interval = rating === 3 ? 7 : 3;
-  else interval = Math.round(interval * ease * (rating === 1 ? 0.6 : rating === 3 ? 1.3 : 1));
+
+  if (grade === 'mastered') {
+    // Full retention boost: nudge ease up so future intervals grow faster.
+    ease = Math.min(3.0, ease + 0.15);
+  } else {
+    // Struggled: a small ease penalty keeps the schedule honest.
+    ease = Math.max(1.3, ease - 0.05);
+  }
+
+  if (reps === 1) {
+    interval = grade === 'mastered' ? 6 : 2;
+  } else {
+    // 'struggled' applies a moderate multiplier; 'mastered' a full boost.
+    const multiplier = grade === 'mastered' ? 1.4 : 0.8;
+    interval = Math.round(interval * ease * multiplier);
+  }
 
   interval = Math.max(1, Math.min(interval, 365));
   return { ...card, ease, interval, reps, lapses, due: now + interval * DAY };

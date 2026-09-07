@@ -26,6 +26,7 @@ export default function Generate() {
   const [keep, setKeep] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [aiDown, setAiDown] = useState(false);
 
   const deckObj = st.ready ? st.decks.find((d) => d.id === deck) : null;
 
@@ -52,7 +53,12 @@ export default function Generate() {
         setKeep(new Set(res.map((_, i) => i)));
       }
     } catch (e: any) {
-      setErr(e?.message ?? 'Something went wrong.');
+      if (useAI) {
+        // Never show raw provider JSON — offer a friendly fallback + Retry.
+        setAiDown(true);
+      } else {
+        setErr(e?.message ?? 'Something went wrong.');
+      }
     } finally {
       setBusy(false);
     }
@@ -199,6 +205,22 @@ export default function Generate() {
               </Pressable>
             )}
           </>
+        )}
+
+        {aiDown && (
+          <Card style={{ borderColor: T.warn + '55', backgroundColor: '#2A2410', padding: 14, gap: 10 }}>
+            <Text style={{ color: T.warn, fontSize: 13.5, lineHeight: 19, fontWeight: '700' }}>
+              AI is temporarily unavailable. Offline generation is ready.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Btn label="Retry" onPress={() => run(true)} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Btn label="Use offline" variant="ghost" onPress={() => run(false)} />
+              </View>
+            </View>
+          </Card>
         )}
       </ScrollView>
     </KeyboardAvoidingView>

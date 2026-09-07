@@ -15,6 +15,7 @@ export default function Home() {
   const due = st.ready ? st.dueCards() : [];
   const fc = useMemo(() => (st.ready ? forecast(st.cards, st.examDate) : 0), [st.cards, st.examDate, st.ready]);
   const daysLeft = Math.max(0, Math.ceil((st.examDate - Date.now()) / DAY));
+  const hasReviews = st.cards.some((c) => c.reps > 0);
   const t = (key: string, vars?: Record<string, string | number>) => translate(st.language, key, vars);
 
   if (!st.ready)
@@ -45,12 +46,18 @@ export default function Home() {
       <Card style={{ alignItems: 'center', paddingVertical: 26 }}>
         <Text style={s.cardLabel}>{t('home.forecast')}</Text>
         <View style={{ height: 14 }} />
-        <Ring pct={fc} sub={t('home.predictedRecall')} />
+        <Ring pct={hasReviews ? fc : 0} sub={t('home.predictedRecall')} label={hasReviews ? undefined : '—'} />
         <View style={{ height: 14 }} />
         <Text style={s.forecastText}>
-          {t('home.forecastLead')}{' '}
-          <Text style={{ color: T.accent2, fontWeight: '800' }}>{fc}%</Text> {t('home.forecastIn')}{' '}
-          <Text style={{ color: T.text, fontWeight: '700' }}>{daysLeft} {t('common.days')}</Text>.
+          {hasReviews ? (
+            <>
+              {t('home.forecastLead')}{' '}
+              <Text style={{ color: T.accent2, fontWeight: '800' }}>{fc}%</Text> {t('home.forecastIn')}{' '}
+              <Text style={{ color: T.text, fontWeight: '700' }}>{daysLeft} {t('common.days')}</Text>.
+            </>
+          ) : (
+            t('home.forecastEmpty')
+          )}
         </Text>
       </Card>
 

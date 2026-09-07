@@ -159,12 +159,19 @@ export function localGenerate(text: string, max = 40): Draft[] {
   return out.slice(0, max);
 }
 
-// Keep the model name in the URL path. Gemini returns 404 when an unavailable
-// model is requested, so use the stable 1.5 Flash model here rather than the
-// retired 2.0 Flash identifier.
+// Pin the stable 1.5 Flash model on the v1beta endpoint. Gemini returns a 404
+// for retired/unavailable model ids, so gemini-1.5-flash is the safe choice.
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
+/**
+ * Calls Gemini to turn notes into flashcards.
+ *
+ * Every failure path (HTTP error, network drop, timeout, malformed JSON) collapses
+ * into one clean, user-facing message. The UI never renders raw provider JSON — it
+ * shows "AI is temporarily unavailable. Offline generation is ready." with a Retry
+ * control. The real error is logged for debugging only.
+ */
 export async function geminiGenerate(text: string, apiKey: string, max = 30): Promise<Draft[]> {
   const prompt = `You are helping an Indian competitive-exam student (JEE/NEET/UPSC) revise.
 Turn the notes below into at most ${max} flashcards for spaced repetition.
@@ -182,32 +189,40 @@ Return ONLY a JSON array, no markdown fence:
 NOTES:
 ${text.slice(0, 12000)}`;
 
-  const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
-    }),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000);
+  try {
+    const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
+      }),
+      signal: controller.signal,
+    });
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(
-      res.status === 400 || res.status === 403
-        ? 'That API key was rejected. Check it in Settings.'
-        : `Gemini error ${res.status}. ${body.slice(0, 120)}`
-    );
+    if (!res.ok) {
+      // Deliberately do NOT surface the provider's raw JSON body on screen.
+      throw new Error('AI is temporarily unavailable. Offline generation is ready.');
+    }
+
+    const json = await res.json();
+    const raw: string = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    const match = raw.match(/\[[\s\S]*\]/);
+    if (!match) throw new Error('AI is temporarily unavailable. Offline generation is ready.');
+
+    const arr = JSON.parse(match[0]) as { front?: string; back?: string }[];
+    return arr
+      .filter((c) => c?.front && c?.back)
+      .slice(0, max)
+      .map((c) => ({ front: String(c.front).trim(), back: String(c.back).trim(), source: 'ai' as const }));
+  } catch (e) {
+    // Network failure, timeout (AbortError), or unparseable payload — never leak
+    // the raw error to the screen.
+    console.error('[ai] geminiGenerate failed:', e);
+    throw new Error('AI is temporarily unavailable. Offline generation is ready.');
+  } finally {
+    clearTimeout(timer);
   }
-
-  const json = await res.json();
-  const raw: string = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-  const match = raw.match(/\[[\s\S]*\]/);
-  if (!match) throw new Error('Could not read the AI response. Try the offline engine.');
-
-  const arr = JSON.parse(match[0]) as { front?: string; back?: string }[];
-  return arr
-    .filter((c) => c?.front && c?.back)
-    .slice(0, max)
-    .map((c) => ({ front: String(c.front).trim(), back: String(c.back).trim(), source: 'ai' as const }));
 }
