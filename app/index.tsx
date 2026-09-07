@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { useStore } from '../src/lib/store';
 import { forecast, DAY } from '../src/lib/srs';
 import { T, SUBJECT_COLORS } from '../src/lib/theme';
+import { translate } from '../src/lib/i18n';
 import { Card, Btn, Ring, Pill, Bar } from '../src/components/UI';
 
 export default function Home() {
@@ -14,11 +15,12 @@ export default function Home() {
   const due = st.ready ? st.dueCards() : [];
   const fc = useMemo(() => (st.ready ? forecast(st.cards, st.examDate) : 0), [st.cards, st.examDate, st.ready]);
   const daysLeft = Math.max(0, Math.ceil((st.examDate - Date.now()) / DAY));
+  const t = (key: string, vars?: Record<string, string | number>) => translate(st.language, key, vars);
 
   if (!st.ready)
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ color: T.dim }}>Loading Smriti…</Text>
+        <Text style={{ color: T.dim }}>{t('home.loading')}</Text>
       </View>
     );
 
@@ -31,7 +33,7 @@ export default function Home() {
       <View style={s.header}>
         <View>
           <Text style={s.hi}>स्मृति · Smriti</Text>
-          <Text style={s.sub}>Remember more. Study less.</Text>
+          <Text style={s.sub}>{t('home.tagline')}</Text>
         </View>
         <Pressable onPress={() => router.push('/settings')} style={s.streak}>
           <Text style={{ fontSize: 15 }}>🔥</Text>
@@ -41,14 +43,14 @@ export default function Home() {
 
       {/* Exam Day Forecast — the hero feature */}
       <Card style={{ alignItems: 'center', paddingVertical: 26 }}>
-        <Text style={s.cardLabel}>EXAM DAY FORECAST</Text>
+        <Text style={s.cardLabel}>{t('home.forecast')}</Text>
         <View style={{ height: 14 }} />
-        <Ring pct={fc} sub="predicted recall" />
+        <Ring pct={fc} sub={t('home.predictedRecall')} />
         <View style={{ height: 14 }} />
         <Text style={s.forecastText}>
-          If you keep this pace, you&apos;ll retain{' '}
-          <Text style={{ color: T.accent2, fontWeight: '800' }}>{fc}%</Text> of your syllabus in{' '}
-          <Text style={{ color: T.text, fontWeight: '700' }}>{daysLeft} days</Text>.
+          {t('home.forecastLead')}{' '}
+          <Text style={{ color: T.accent2, fontWeight: '800' }}>{fc}%</Text> {t('home.forecastIn')}{' '}
+          <Text style={{ color: T.text, fontWeight: '700' }}>{daysLeft} {t('common.days')}</Text>.
         </Text>
       </Card>
 
@@ -65,7 +67,7 @@ export default function Home() {
           <View>
             <Text style={[s.bigN, !due.length && { color: T.dim }]}>{due.length}</Text>
             <Text style={[s.bigL, !due.length && { color: T.dim }]}>
-              {due.length ? 'cards due right now' : 'all caught up ✨'}
+              {due.length ? t('home.cardsDue') : t('home.caughtUp')}
             </Text>
           </View>
           {!!due.length && <Text style={{ fontSize: 32 }}>→</Text>}
@@ -75,15 +77,15 @@ export default function Home() {
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <Card style={{ flex: 1, alignItems: 'center', paddingVertical: 16 }}>
           <Text style={s.statN}>{st.stats.totalReviews}</Text>
-          <Text style={s.statL}>reviews</Text>
+          <Text style={s.statL}>{t('home.reviews')}</Text>
         </Card>
         <Card style={{ flex: 1, alignItems: 'center', paddingVertical: 16 }}>
           <Text style={[s.statN, { color: T.gold }]}>{st.stats.xp}</Text>
-          <Text style={s.statL}>XP</Text>
+          <Text style={s.statL}>{t('home.xp')}</Text>
         </Card>
         <Card style={{ flex: 1, alignItems: 'center', paddingVertical: 16 }}>
           <Text style={[s.statN, { color: T.good }]}>{st.cards.length}</Text>
-          <Text style={s.statL}>cards</Text>
+          <Text style={s.statL}>{t('home.cards')}</Text>
         </Card>
       </View>
 
@@ -93,9 +95,9 @@ export default function Home() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <Text style={{ fontSize: 22 }}>⚡</Text>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: T.gold, fontWeight: '800', fontSize: 15 }}>Smriti Pro</Text>
+                <Text style={{ color: T.gold, fontWeight: '800', fontSize: 15 }}>{t('home.proTitle')}</Text>
                 <Text style={{ color: T.sub, fontSize: 12.5, marginTop: 2 }}>
-                  Unlimited decks, AI card generation, exam analytics
+                  {t('home.proDescription')}
                 </Text>
               </View>
               <Text style={{ color: T.gold, fontSize: 18 }}>›</Text>
@@ -105,9 +107,9 @@ export default function Home() {
       )}
 
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-        <Text style={s.section}>Your decks</Text>
+        <Text style={s.section}>{t('home.yourDecks')}</Text>
         <Pressable onPress={() => router.push('/new-deck')}>
-          <Text style={{ color: T.accent, fontWeight: '700' }}>+ New</Text>
+          <Text style={{ color: T.accent, fontWeight: '700' }}>{t('home.new')}</Text>
         </Pressable>
       </View>
 
@@ -127,7 +129,7 @@ export default function Home() {
                     {d.subject} · {d.exam} · {cards.length} cards
                   </Text>
                 </View>
-                {dueN > 0 && <Pill text={`${dueN} due`} color={T.bad} />}
+                {dueN > 0 && <Pill text={t('home.due', { count: dueN })} color={T.bad} />}
               </View>
               <View style={{ height: 12 }} />
               <Bar pct={cards.length ? (learned / cards.length) * 100 : 0} color={col} />
@@ -136,7 +138,7 @@ export default function Home() {
         );
       })}
 
-      <Text style={s.foot}>Built for Shipaton 2026 · Next Gen Award</Text>
+      <Text style={s.foot}>{t('home.builtFor')}</Text>
     </ScrollView>
   );
 }

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Card, newCard, review as srsReview, isDue } from './srs';
 import { SEED_DECKS } from './seed';
+import { Language } from './i18n';
 
 export type Deck = {
   id: string;
@@ -23,6 +24,7 @@ type State = {
   isPro: boolean;
   examDate: number;
   geminiKey: string;
+  language: Language;
   gens: { date: string; count: number };
   ready: boolean;
 };
@@ -31,11 +33,12 @@ type Ctx = State & {
   dueCards: (deckId?: string) => Card[];
   rate: (id: string, r: 0 | 1 | 2 | 3) => void;
   addDeck: (name: string, subject: string, exam: string) => string;
-  addCard: (deckId: string, front: string, back: string) => void;
+  addCard: (deckId: string, front: string, back: string, topic?: string) => void;
   deleteDeck: (id: string) => void;
   setPro: (v: boolean) => void;
   setExamDate: (d: number) => void;
   setGeminiKey: (k: string) => void;
+  setLanguage: (language: Language) => void;
   generationsLeft: () => number;
   recordGeneration: () => void;
   reset: () => void;
@@ -60,6 +63,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     isPro: false,
     examDate: Date.now() + 60 * 86400000,
     geminiKey: '',
+    language: 'en',
     gens: { date: '', count: 0 },
     ready: false,
   });
@@ -69,7 +73,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const raw = await AsyncStorage.getItem(KEY);
       if (raw) {
         try {
-          setS({ geminiKey: '', gens: { date: '', count: 0 }, ...JSON.parse(raw), ready: true });
+          const saved = JSON.parse(raw);
+          setS((p) => ({
+            ...p,
+            ...saved,
+            geminiKey: saved.geminiKey ?? '',
+            language: saved.language === 'hi' ? 'hi' : 'en',
+            gens: saved.gens ?? { date: '', count: 0 },
+            ready: true,
+          }));
           return;
         } catch {}
       }
@@ -78,7 +90,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       SEED_DECKS.forEach((d, i) => {
         const id = `seed-${i}`;
         decks.push({ id, name: d.name, subject: d.subject, exam: d.exam });
-        d.cards.forEach(([f, b]) => cards.push(newCard(id, f, b)));
+        d.cards.forEach(([f, b]) => cards.push(newCard(id, f, b, d.name)));
       });
       setS((p) => ({ ...p, decks, cards, ready: true }));
     })();
@@ -115,8 +127,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         setS((p) => ({ ...p, decks: [...p.decks, { id, name, subject, exam }] }));
         return id;
       },
-      addCard: (deckId, front, back) =>
-        setS((p) => ({ ...p, cards: [...p.cards, newCard(deckId, front, back)] })),
+      addCard: (deckId, front, back, topic) =>
+        setS((p) => {
+          const deck = p.decks.find((d) => d.id === deckId);
+          return { ...p, cards: [...p.cards, newCard(deckId, front, back, topic ?? deck?.name ?? deck?.subject)] };
+        }),
       deleteDeck: (id) =>
         setS((p) => ({
           ...p,
@@ -126,6 +141,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setPro: (v) => setS((p) => ({ ...p, isPro: v })),
       setExamDate: (d) => setS((p) => ({ ...p, examDate: d })),
       setGeminiKey: (k) => setS((p) => ({ ...p, geminiKey: k.trim() })),
+      setLanguage: (language) => setS((p) => ({ ...p, language })),
       generationsLeft: () => {
         if (s.isPro) return Infinity;
         const used = s.gens.date === today() ? s.gens.count : 0;

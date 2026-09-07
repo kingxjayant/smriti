@@ -14,11 +14,13 @@ export type Card = {
   lapses: number;
   due: number;       // epoch ms
   createdAt: number;
+  /** Optional topic label used by the settings heatmap. Older cards may not have one. */
+  topic?: string;
 };
 
 export const DAY = 86400000;
 
-export function newCard(deckId: string, front: string, back: string): Card {
+export function newCard(deckId: string, front: string, back: string, topic?: string): Card {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     deckId,
@@ -30,6 +32,7 @@ export function newCard(deckId: string, front: string, back: string): Card {
     lapses: 0,
     due: Date.now(),
     createdAt: Date.now(),
+    ...(topic ? { topic } : {}),
   };
 }
 
