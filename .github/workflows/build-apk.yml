@@ -46,54 +46,22 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Generate native Android project (Expo prebuild)
-        run: npx expo prebuild --platform android --non-interactive --no-install
+        run: npx expo prebuild --platform android --no-install
         env:
           EXPO_NO_TELEMETRY: "1"
           CI: "true"
 
-      - name: Create signing keystore (debug-grade, so the artifact is installable)
-        run: |
-          keytool -genkeypair -v \
-            -keystore android/app/release.keystore \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -alias smriti -storepass android -keypass android \
-            -dname "CN=Smriti,O=Shipaton"
-
-      - name: Wire release signing (best-effort; skips if already configured)
-        run: |
-          python3 - <<'PY'
-          import os
-          p = 'android/app/build.gradle'
-          if not os.path.exists(p):
-              raise SystemExit(0)
-          s = open(p).read()
-          changed = False
-          if 'signingConfigs {' in s and 'keyAlias' not in s:
-              s = s.replace('signingConfigs {', '''signingConfigs {
-                  release {
-                      storeFile file("release.keystore")
-                      storePassword "android"
-                      keyAlias "smriti"
-                      keyPassword "android"
-                  }''', 1)
-              changed = True
-          if 'signingConfig signingConfigs.release' not in s:
-              idx = s.find('buildTypes {')
-              if idx != -1:
-                  rel = s.find('release {', idx)
-                  if rel != -1:
-                      s = s[:rel] + 'release {\n            signingConfig signingConfigs.release' + s[rel + len('release {'):]
-                      changed = True
-          if changed:
-              open(p, 'w').write(s)
-              print('patched signing config')
-          else:
-              print('signing config left as-is')
-          PY
+      # Expo's generated release build signs with the *debug* keystore
+      # (buildTypes.release -> signingConfigs.debug -> android/app/debug.keystore).
+      # That file is only auto-created when a debug build runs, so assembleRelease
+      # fails on a fresh runner. Generate the standard Android debug keystore here
+      # so the release APK signs cleanly and stays installable — no manual secret.
+      - name: Generate debug keystore (required to sign the release APK)
+        run: keytool -genkeypair -v -keystore android/app/debug.keystore -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug, OU=Android, O=Android, L=Mountain View, ST=California, C=US"
 
       - name: Build release APK
         working-directory: android
-        run: ./gradlew assembleRelease --no-daemon
+        run: chmod +x ./gradlew && ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
