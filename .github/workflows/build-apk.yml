@@ -1,6 +1,6 @@
 name: Build Android APK
 
-# Builds a release APK on every push to main (and via manual dispatch) and
+# Builds an installable APK on every push to main (and via manual dispatch) and
 # uploads it as a downloadable GitHub Actions artifact. The heavy lifting — the
 # actual Gradle/APK compilation — happens here on GitHub runners, never locally.
 on:
@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build release APK
+    name: Build APK
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -51,21 +51,14 @@ jobs:
           EXPO_NO_TELEMETRY: "1"
           CI: "true"
 
-      # Expo's generated release build signs with the *debug* keystore
-      # (buildTypes.release -> signingConfigs.debug -> android/app/debug.keystore).
-      # That file is only auto-created when a debug build runs, so assembleRelease
-      # fails on a fresh runner. Generate the standard Android debug keystore here
-      # so the release APK signs cleanly and stays installable — no manual secret.
-      - name: Generate debug keystore (required to sign the release APK)
-        run: keytool -genkeypair -v -keystore android/app/debug.keystore -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug, OU=Android, O=Android, L=Mountain View, ST=California, C=US"
-
-      - name: Build release APK
-        working-directory: android
-        run: chmod +x ./gradlew && ./gradlew assembleRelease --no-daemon --stacktrace
+      # assembleDebug is auto-signed by the Android Gradle Plugin, which generates
+      # its own debug keystore — no external keystore or secret is required.
+      - name: Build debug APK
+        run: cd android && chmod +x ./gradlew && ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: smriti-release-apk
-          path: android/app/build/outputs/apk/release/*.apk
+          name: smriti-apk
+          path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: warn
