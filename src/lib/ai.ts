@@ -159,8 +159,11 @@ export function localGenerate(text: string, max = 40): Draft[] {
   return out.slice(0, max);
 }
 
+// Keep the model name in the URL path. Gemini returns 404 when an unavailable
+// model is requested, so use the stable 1.5 Flash model here rather than the
+// retired 2.0 Flash identifier.
 const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
 export async function geminiGenerate(text: string, apiKey: string, max = 30): Promise<Draft[]> {
   const prompt = `You are helping an Indian competitive-exam student (JEE/NEET/UPSC) revise.
