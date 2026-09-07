@@ -1,0 +1,103 @@
+name: Build Android APK
+
+# Builds a release APK on every push to main (and via manual dispatch) and
+# uploads it as a downloadable GitHub Actions artifact. The heavy lifting — the
+# actual Gradle/APK compilation — happens here on GitHub runners, never locally.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  build-apk:
+    name: Build release APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up Java (JDK 17)
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Type-check (tsc --noEmit)
+        run: npx tsc --noEmit
+
+      - name: Generate native Android project (Expo prebuild)
+        run: npx expo prebuild --platform android --non-interactive --no-install
+        env:
+          EXPO_NO_TELEMETRY: "1"
+          CI: "true"
+
+      - name: Create signing keystore (debug-grade, so the artifact is installable)
+        run: |
+          keytool -genkeypair -v \
+            -keystore android/app/release.keystore \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -alias smriti -storepass android -keypass android \
+            -dname "CN=Smriti,O=Shipaton"
+
+      - name: Wire release signing (best-effort; skips if already configured)
+        run: |
+          python3 - <<'PY'
+          import os
+          p = 'android/app/build.gradle'
+          if not os.path.exists(p):
+              raise SystemExit(0)
+          s = open(p).read()
+          changed = False
+          if 'signingConfigs {' in s and 'keyAlias' not in s:
+              s = s.replace('signingConfigs {', '''signingConfigs {
+                  release {
+                      storeFile file("release.keystore")
+                      storePassword "android"
+                      keyAlias "smriti"
+                      keyPassword "android"
+                  }''', 1)
+              changed = True
+          if 'signingConfig signingConfigs.release' not in s:
+              idx = s.find('buildTypes {')
+              if idx != -1:
+                  rel = s.find('release {', idx)
+                  if rel != -1:
+                      s = s[:rel] + 'release {\n            signingConfig signingConfigs.release' + s[rel + len('release {'):]
+                      changed = True
+          if changed:
+              open(p, 'w').write(s)
+              print('patched signing config')
+          else:
+              print('signing config left as-is')
+          PY
+
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: smriti-release-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: warn
