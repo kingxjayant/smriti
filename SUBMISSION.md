@@ -24,9 +24,10 @@ Offline-first spaced repetition for India's 13M exam aspirants. A live Exam Day 
 | 0:15–0:35 | Home screen, point at ring | "This is the Exam Day Forecast. It's not what's due today — it's a forgetting-curve projection to your actual exam date. Right now this student walks into the hall remembering 62% of their syllabus." |
 | 0:35–1:05 | Tap due card → review flow, rate 3–4 cards | "Tap through. Real JEE, NEET and UPSC content ships in the box. Flip, rate honestly, and my SM-2 variant reschedules — tuned shorter than standard Anki because exams have deadlines." |
 | 1:05–1:20 | Back to home, ring has moved | "Every review moves the forecast. That's the whole motivational loop." |
-| 1:20–1:40 | Hit the 30-card cap → paywall | "Monetization runs on RevenueCat. The paywall fires at the daily cap — mid-session, when the student is motivated — not at cold launch. Three packages in one offering so I can A/B price from the dashboard." |
-| 1:40–1:50 | Buy → Pro unlocked → settings | "Entitlement unlocks instantly, restore works, and Pro state persists." |
-| 1:50–2:00 | Airplane-mode toggle, app still works | "And it's fully offline. No backend, no server bill, works on a ₹5,000 phone with no data. That's Smriti." |
+| 1:20–1:40 | Deck → "Generate cards from notes" → paste notes → cards appear | "Making cards is the reason people quit spaced repetition. So: paste your notes, get a deck. And this parser runs entirely on-device — no API key, no internet. It works in airplane mode on a five-thousand-rupee phone." |
+| 1:40–1:55 | Hit the cap → paywall | "Monetization runs on RevenueCat. The paywall fires at the daily cap — mid-session, when the student is motivated — not at cold launch. Three packages in one offering so I can A/B price from the dashboard." |
+| 1:55–2:05 | Buy → Pro unlocked | "Entitlement unlocks instantly, restore works, and Pro state persists." |
+| 2:05–2:15 | Airplane-mode toggle, app still works | "And it's fully offline. No backend, no server bill, works on a ₹5,000 phone with no data. That's Smriti." |
 
 **Recording tips (phone only):** Android built-in screen recorder → 1080p, 60fps, mic ON. Record in one take; re-record rather than edit. Upload to YouTube as **Public** (not unlisted — Devpost sometimes fails on unlisted).
 
@@ -63,7 +64,7 @@ Post at **9–10 PM IST** (peak Indian dev-Twitter). Reply to every comment with
 
 ## 5. What to add next (highest score-per-hour)
 
-1. **AI card generation** — paste notes → deck. Biggest Pro justification. Gemini free tier.
+1. ~~AI card generation~~ — **done.** Offline parser + optional Gemini.
 2. **Weak-topic heatmap** in settings — Design Award bait, ~2 hours.
 3. **Local notifications** at a chosen revision hour (expo-notifications is already installed).
 4. **Native RevenueCat wiring** — if you ever get a laptop or free EAS build, swap `purchases.ts` internals for `react-native-purchases`. The boundary is already correct.
