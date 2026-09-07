@@ -8,8 +8,8 @@ import { Btn } from '../src/components/UI';
 import { getOfferings, purchasePackage, restorePurchases, Pkg } from '../src/lib/purchases';
 
 const PERKS = [
+  ['🤖', 'Unlimited card generation', 'Paste a whole chapter and get a deck in seconds. Free plan generates 3 times a day.'],
   ['♾️', 'Unlimited decks & daily reviews', 'Free plan caps you at 3 decks and 30 reviews a day.'],
-  ['🤖', 'AI card generation', 'Paste your notes or a PDF chapter — get a clean deck in seconds.'],
   ['📊', 'Exam analytics', 'Per-topic weak-spot maps and a live Exam Day Forecast.'],
   ['☁️', 'Cross-device sync', 'Revise on your phone, add cards on the web.'],
   ['🌙', 'Offline forever', 'Full syllabus works with zero data — built for Indian networks.'],

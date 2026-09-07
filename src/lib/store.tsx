@@ -13,12 +13,17 @@ export type Deck = {
 
 type Stats = { streak: number; lastStudy: string | null; totalReviews: number; xp: number };
 
+/** Free users get a few generations a day — enough to feel the value, not enough to never pay. */
+export const FREE_DAILY_GENERATIONS = 3;
+
 type State = {
   decks: Deck[];
   cards: Card[];
   stats: Stats;
   isPro: boolean;
   examDate: number;
+  geminiKey: string;
+  gens: { date: string; count: number };
   ready: boolean;
 };
 
@@ -30,6 +35,9 @@ type Ctx = State & {
   deleteDeck: (id: string) => void;
   setPro: (v: boolean) => void;
   setExamDate: (d: number) => void;
+  setGeminiKey: (k: string) => void;
+  generationsLeft: () => number;
+  recordGeneration: () => void;
   reset: () => void;
 };
 
@@ -51,6 +59,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     stats: { streak: 0, lastStudy: null, totalReviews: 0, xp: 0 },
     isPro: false,
     examDate: Date.now() + 60 * 86400000,
+    geminiKey: '',
+    gens: { date: '', count: 0 },
     ready: false,
   });
 
@@ -59,7 +69,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const raw = await AsyncStorage.getItem(KEY);
       if (raw) {
         try {
-          setS({ ...JSON.parse(raw), ready: true });
+          setS({ geminiKey: '', gens: { date: '', count: 0 }, ...JSON.parse(raw), ready: true });
           return;
         } catch {}
       }
@@ -115,6 +125,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         })),
       setPro: (v) => setS((p) => ({ ...p, isPro: v })),
       setExamDate: (d) => setS((p) => ({ ...p, examDate: d })),
+      setGeminiKey: (k) => setS((p) => ({ ...p, geminiKey: k.trim() })),
+      generationsLeft: () => {
+        if (s.isPro) return Infinity;
+        const used = s.gens.date === today() ? s.gens.count : 0;
+        return Math.max(0, FREE_DAILY_GENERATIONS - used);
+      },
+      recordGeneration: () =>
+        setS((p) => {
+          const t = today();
+          const used = p.gens.date === t ? p.gens.count : 0;
+          return { ...p, gens: { date: t, count: used + 1 } };
+        }),
       reset: () => {
         AsyncStorage.removeItem(KEY);
         setS((p) => ({ ...p, ready: false }));

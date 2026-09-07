@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, Pressable, StyleSheet, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useStore } from '../src/lib/store';
@@ -10,6 +10,7 @@ import { DAY, forecast } from '../src/lib/srs';
 export default function Settings() {
   const st = useStore();
   const ins = useSafeAreaInsets();
+  const [key, setKey] = useState('');
   if (!st.ready) return null;
   const daysLeft = Math.max(0, Math.ceil((st.examDate - Date.now()) / DAY));
 
@@ -51,6 +52,43 @@ export default function Settings() {
             </Pressable>
           ))}
         </View>
+      </Card>
+
+      <Card style={{ gap: 10 }}>
+        <Text style={s.sec}>AI card generation</Text>
+        <Text style={{ color: T.sub, fontSize: 13, lineHeight: 19 }}>
+          Optional. Card generation already works fully offline — add a free Gemini API key only if
+          you want sharper cards from messy prose. Stored on this device only.
+        </Text>
+        {st.geminiKey ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Text style={{ color: T.good, fontSize: 13, flex: 1 }}>
+              Key saved ····{st.geminiKey.slice(-4)}
+            </Text>
+            <Pressable onPress={() => st.setGeminiKey('')}>
+              <Text style={{ color: T.bad, fontSize: 13 }}>Remove</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <>
+            <TextInput
+              placeholder="Paste Gemini API key"
+              placeholderTextColor={T.dim}
+              value={key}
+              onChangeText={setKey}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={{
+                backgroundColor: T.bg2, borderRadius: 12, borderWidth: 1, borderColor: T.line,
+                color: T.text, padding: 13, fontSize: 14,
+              }}
+            />
+            <Btn label="Save key" variant="soft" onPress={() => { st.setGeminiKey(key); setKey(''); }} />
+            <Text style={{ color: T.dim, fontSize: 11.5, lineHeight: 17 }}>
+              Get one free at aistudio.google.com/apikey
+            </Text>
+          </>
+        )}
       </Card>
 
       {!st.isPro ? (

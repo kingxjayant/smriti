@@ -37,6 +37,8 @@ That single number — *"you'll walk in remembering 74%"* — is the app's whole
 | 📈 | **Exam Day Forecast** — forgetting-curve projection to your real exam date |
 | 📴 | **100% offline** — every card, every review, zero network calls. Built for patchy Indian data |
 | 🎴 | **3D flip review** with 4-point rating (Again / Hard / Good / Easy) |
+| ✍️ | **Notes → cards** — paste notes, get a deck. Runs **fully on-device**, no API key, no internet |
+| ✨ | **Optional AI mode** — bring your own free Gemini key for sharper cards from messy prose |
 | 📚 | **Pre-loaded decks** — Modern Physics, Chemical Bonding, Indian Polity, Human Physiology, Calculus |
 | 🔥 | **Streaks & XP** with per-card retention bars |
 | ⚡ | **Smriti Pro** via RevenueCat — unlimited decks, AI cards, analytics, sync |
@@ -45,7 +47,7 @@ That single number — *"you'll walk in remembering 74%"* — is the app's whole
 
 Freemium with limits that bind exactly when the app has already proven value:
 
-- **Free:** 5 starter decks, 3 custom decks, 30 reviews/day
+- **Free:** 5 starter decks, 3 custom decks, 30 reviews/day, 3 card generations/day
 - **Pro:** ₹99/mo · ₹699/yr (41% off) · ₹1,499 lifetime
 
 Three packages ship in one offering so pricing can be A/B tested from the RevenueCat dashboard without a release. The paywall triggers contextually — at the daily review cap mid-session, when a student is *motivated*, not at cold launch.
@@ -78,11 +80,13 @@ app/
   _layout.tsx      store provider + dark stack navigator
   index.tsx        home — forecast ring, due count, deck list
   review.tsx       flip-card review session + rating
+  generate.tsx     notes → cards, with a review-and-select step
   paywall.tsx      RevenueCat paywall (3 packages)
   new-deck.tsx     deck creator
   settings.tsx     progress, exam date, subscription
   deck/[id].tsx    deck detail + card editor
 src/lib/
+  ai.ts            offline note→card parser + optional Gemini engine
   srs.ts           SM-2 engine, retention & forecast maths
   store.tsx        app state, persistence, streaks, XP
   purchases.ts     RevenueCat boundary

@@ -51,6 +51,12 @@ export default function Deck() {
       </View>
 
       <Btn
+        label="✨ Generate cards from notes"
+        variant="soft"
+        onPress={() => router.push(`/generate?deck=${id}`)}
+      />
+
+      <Btn
         label={dueN ? `Review ${dueN} due cards` : 'Nothing due — practise anyway'}
         onPress={() => router.push(dueN ? `/review?deck=${id}` : `/review?deck=${id}`)}
         variant={dueN ? 'primary' : 'soft'}
