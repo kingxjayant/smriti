@@ -159,10 +159,12 @@ export function localGenerate(text: string, max = 40): Draft[] {
   return out.slice(0, max);
 }
 
-// Pin the stable 1.5 Flash model on the v1beta endpoint. Gemini returns a 404
-// for retired/unavailable model ids, so gemini-1.5-flash is the safe choice.
-const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+// Pin a supported Gemini model. Google returns 404 for the bare 'gemini-1.5-flash'
+// id on v1beta, so we use the 'gemini-1.5-flash-latest' alias and fall back to
+// 'gemini-pro' if the first model is unavailable. The base URL already contains
+// the API version + '/models/', and each model name is appended exactly once.
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com';
+const GEMINI_MODELS = ['gemini-1.5-flash-latest', 'gemini-pro'];
 
 /**
  * Calls Gemini to turn notes into flashcards.
@@ -189,49 +191,72 @@ Return ONLY a JSON array, no markdown fence:
 NOTES:
 ${text.slice(0, 12000)}`;
 
-  const url = `${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20000);
   try {
-    console.log('[ai] Gemini request ->', GEMINI_URL, '| key length:', apiKey?.length);
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
-      }),
-      signal: controller.signal,
-    });
+    let lastError = 'AI generation failed: no model available.';
+    for (const model of GEMINI_MODELS) {
+      // Single '/models/' prefix, no duplication: BASE + '/v1beta/models/' + model.
+      const url = `${GEMINI_BASE}/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      console.log('[ai] Gemini request ->', model, '| key length:', apiKey?.length);
 
-    if (!res.ok) {
-      const status = res.status;
-      const body = await res.text().catch(() => '');
-      // Extract a short, human-readable reason (never raw JSON) for the UI.
-      let reason = `HTTP ${status}`;
+      let res: Awaited<ReturnType<typeof fetch>>;
       try {
-        const parsed = JSON.parse(body);
-        if (parsed?.error?.message) reason = `HTTP ${status}: ${parsed.error.message}`;
-      } catch {
-        if (body) reason = `HTTP ${status}: ${body.slice(0, 200)}`;
+        res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
+          }),
+          signal: controller.signal,
+        });
+      } catch (fetchErr: any) {
+        // Re-throw an abort so the outer handler reports a timeout.
+        if (fetchErr?.name === 'AbortError') throw fetchErr;
+        lastError = `AI generation failed: ${fetchErr?.message ?? 'network error'}`;
+        console.error('[ai] Gemini fetch error for', model, fetchErr);
+        continue;
       }
-      console.error('[ai] Gemini non-OK response', status, body);
-      throw new Error(`AI request failed (${reason}).`);
-    }
 
-    const json = await res.json();
-    const raw: string = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-    const match = raw.match(/\[[\s\S]*\]/);
-    if (!match) {
-      console.error('[ai] Gemini returned no JSON array. Raw response:', raw);
-      throw new Error('AI returned no usable cards. Try different notes or the offline engine.');
-    }
+      if (!res.ok) {
+        const status = res.status;
+        const body = await res.text().catch(() => '');
+        // Short, human-readable reason (never raw JSON) for the UI.
+        let reason = `HTTP ${status}`;
+        try {
+          const parsed = JSON.parse(body);
+          if (parsed?.error?.message) reason = `HTTP ${status}: ${parsed.error.message}`;
+        } catch {
+          if (body) reason = `HTTP ${status}: ${body.slice(0, 200)}`;
+        }
+        console.error('[ai] Gemini non-OK response', model, status, body);
+        // 404 = model id not found — fall through to the next candidate.
+        if (status === 404) {
+          lastError = `AI request failed (${reason}).`;
+          continue;
+        }
+        // Auth/quota/server errors are unlikely to differ per model — surface now.
+        throw new Error(`AI request failed (${reason}).`);
+      }
 
-    const arr = JSON.parse(match[0]) as { front?: string; back?: string }[];
-    return arr
-      .filter((c) => c?.front && c?.back)
-      .slice(0, max)
-      .map((c) => ({ front: String(c.front).trim(), back: String(c.back).trim(), source: 'ai' as const }));
+      const json = await res.json();
+      const raw: string = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+      const match = raw.match(/\[[\s\S]*\]/);
+      if (!match) {
+        console.error('[ai] Gemini returned no JSON array. Raw response:', raw);
+        lastError = 'AI returned no usable cards. Try different notes or the offline engine.';
+        continue;
+      }
+
+      const arr = JSON.parse(match[0]) as { front?: string; back?: string }[];
+      console.log('[ai] Gemini OK via', model, '->', arr.length, 'cards');
+      return arr
+        .filter((c) => c?.front && c?.back)
+        .slice(0, max)
+        .map((c) => ({ front: String(c.front).trim(), back: String(c.back).trim(), source: 'ai' as const }));
+    }
+    throw new Error(lastError);
   } catch (e: any) {
     if (e?.name === 'AbortError') {
       console.error('[ai] Gemini request timed out after 20s');
