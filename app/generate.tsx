@@ -27,6 +27,7 @@ export default function Generate() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [aiDown, setAiDown] = useState(false);
+  const [aiError, setAiError] = useState('');
 
   const deckObj = st.ready ? st.decks.find((d) => d.id === deck) : null;
 
@@ -54,7 +55,8 @@ export default function Generate() {
       }
     } catch (e: any) {
       if (useAI) {
-        // Never show raw provider JSON — offer a friendly fallback + Retry.
+        // Surface the real error so we can see why AI failed (status / network).
+        setAiError(e?.message ?? 'Unknown error');
         setAiDown(true);
       } else {
         setErr(e?.message ?? 'Something went wrong.');
@@ -208,9 +210,12 @@ export default function Generate() {
         )}
 
         {aiDown && (
-          <Card style={{ borderColor: T.warn + '55', backgroundColor: '#2A2410', padding: 14, gap: 10 }}>
-            <Text style={{ color: T.warn, fontSize: 13.5, lineHeight: 19, fontWeight: '700' }}>
-              AI is temporarily unavailable. Offline generation is ready.
+          <Card style={{ borderColor: T.bad + '55', backgroundColor: '#2A1620', padding: 14, gap: 10 }}>
+            <Text style={{ color: T.bad, fontSize: 13.5, lineHeight: 19, fontWeight: '700' }}>
+              AI generation failed
+            </Text>
+            <Text style={{ color: T.sub, fontSize: 12.5, lineHeight: 18 }}>
+              {aiError || 'AI is temporarily unavailable. Offline generation is ready.'}
             </Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <View style={{ flex: 1 }}>
