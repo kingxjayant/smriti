@@ -161,10 +161,11 @@ export function localGenerate(text: string, max = 40): Draft[] {
   return out.slice(0, max);
 }
 
-// Models to try, in order. The official @google/generative-ai SDK builds the
-// correct, versioned endpoint for each model — no manual URL construction, so we
-// never 404 on a malformed path. We fall through the list until one responds.
-const GEMINI_MODELS = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest'];
+// Models to try, in order, using exact IDs (no '-latest' suffix — that 404s on
+// this endpoint). The official @google/generative-ai SDK builds the correct
+// endpoint; we force apiVersion 'v1' via requestOptions and fall through the list
+// until one responds.
+const GEMINI_MODELS = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
 
 /**
  * Calls Gemini (via the official SDK) to turn notes into flashcards.
