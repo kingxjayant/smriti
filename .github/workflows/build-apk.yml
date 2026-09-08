@@ -3,8 +3,8 @@ name: Build Android APK
 # Builds a fully standalone (offline) release APK on every push to main (and via
 # manual dispatch) and uploads it as a downloadable GitHub Actions artifact. The
 # heavy lifting — the actual Gradle/APK compilation — happens here on GitHub
-# runners, never locally. The JS bundle is pre-built and embedded so the APK
-# needs no Metro dev server.
+# runners, never locally. The React Native Gradle plugin bundles the JavaScript
+# offline automatically during assembleRelease, so the APK needs no Metro server.
 on:
   push:
     branches: [main]
@@ -53,21 +53,10 @@ jobs:
           EXPO_NO_TELEMETRY: "1"
           CI: "true"
 
-      # Offline JS/asset pre-bundle safety net (same command the Gradle plugin
-      # uses for release). The release build below also bundles, but this
-      # guarantees index.android.bundle is present in src/main/assets.
-      - name: Bundle JS + assets offline (standalone APK)
-        run: |
-          mkdir -p android/app/src/main/assets
-          npx expo export:embed --platform android
-          ls -la android/app/src/main/assets
-        env:
-          EXPO_NO_TELEMETRY: "1"
-          CI: "true"
-
-      # assembleRelease bundles AND signs the JS for a fully standalone APK. It
-      # signs with signingConfigs.debug (android/app/debug.keystore), which is
-      # only created when a debug build runs — so we build debug first to
+      # assembleRelease bundles AND signs the JS offline (via the RN Gradle
+      # plugin's createBundleReleaseJsAndAssets) for a fully standalone APK. The
+      # release build signs with signingConfigs.debug (android/app/debug.keystore),
+      # which is only created when a debug build runs — so we build debug first to
       # generate the keystore, then build the release APK.
       - name: Build release APK
         run: |
