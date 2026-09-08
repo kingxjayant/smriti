@@ -18,10 +18,18 @@ permissions:
   contents: read
   actions: write
 
+# Force every step to run non-interactively so Expo prebuild / Gradle never
+# block waiting on stdin (which caused a multi-hour hang).
+env:
+  CI: "true"
+  NONINTERACTIVE: "1"
+  EXPO_NO_TELEMETRY: "1"
+
 jobs:
   build-apk:
     name: Build APK
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,14 +57,11 @@ jobs:
 
       - name: Generate native Android project (Expo prebuild)
         run: npx expo prebuild --platform android --no-install
-        env:
-          EXPO_NO_TELEMETRY: "1"
-          CI: "true"
 
       # assembleRelease bundles AND signs the JS offline (via the RN Gradle
       # plugin's createBundleReleaseJsAndAssets) for a fully standalone APK. The
       # release build signs with signingConfigs.debug (android/app/debug.keystore),
-      # which is only created when a debug build runs — so we build debug first to
+      # which is only created when a debug build runs — so build debug first to
       # generate the keystore, then build the release APK.
       - name: Build release APK
         run: |
