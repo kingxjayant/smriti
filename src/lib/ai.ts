@@ -12,6 +12,8 @@
  * usable cards, and it degrades gracefully into cloze deletions for plain prose.
  */
 
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
 export type Draft = { front: string; back: string; source: 'rule' | 'cloze' | 'ai' };
 
 const STOP = new Set([
@@ -159,20 +161,16 @@ export function localGenerate(text: string, max = 40): Draft[] {
   return out.slice(0, max);
 }
 
-// Pin a supported Gemini model. Google returns 404 for the bare 'gemini-1.5-flash'
-// id on v1beta, so we use the 'gemini-1.5-flash-latest' alias and fall back to
-// 'gemini-pro' if the first model is unavailable. The base URL already contains
-// the API version + '/models/', and each model name is appended exactly once.
-const GEMINI_BASE = 'https://generativelanguage.googleapis.com';
-const GEMINI_MODELS = ['gemini-1.5-flash-latest', 'gemini-pro'];
+// Models to try, in order. The official @google/generative-ai SDK builds the
+// correct, versioned endpoint for each model — no manual URL construction, so we
+// never 404 on a malformed path. We fall through the list until one responds.
+const GEMINI_MODELS = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest'];
 
 /**
- * Calls Gemini to turn notes into flashcards.
+ * Calls Gemini (via the official SDK) to turn notes into flashcards.
  *
- * Every failure path (HTTP error, network drop, timeout, malformed JSON) collapses
- * into one clean, user-facing message. The UI never renders raw provider JSON — it
- * shows "AI is temporarily unavailable. Offline generation is ready." with a Retry
- * control. The real error is logged for debugging only.
+ * The real failure reason is surfaced in the thrown message so the UI can show it,
+ * but raw provider JSON is never rendered on screen.
  */
 export async function geminiGenerate(text: string, apiKey: string, max = 30): Promise<Draft[]> {
   const prompt = `You are helping an Indian competitive-exam student (JEE/NEET/UPSC) revise.
@@ -191,81 +189,43 @@ Return ONLY a JSON array, no markdown fence:
 NOTES:
 ${text.slice(0, 12000)}`;
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
-  try {
-    let lastError = 'AI generation failed: no model available.';
-    for (const model of GEMINI_MODELS) {
-      // Single '/models/' prefix, no duplication: BASE + '/v1beta/models/' + model.
-      const url = `${GEMINI_BASE}/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-      console.log('[ai] Gemini request ->', model, '| key length:', apiKey?.length);
+  const genAI = new GoogleGenerativeAI(apiKey);
+  let lastError = 'AI generation failed: no model available.';
 
-      let res: Awaited<ReturnType<typeof fetch>>;
-      try {
-        res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
-          }),
-          signal: controller.signal,
-        });
-      } catch (fetchErr: any) {
-        // Re-throw an abort so the outer handler reports a timeout.
-        if (fetchErr?.name === 'AbortError') throw fetchErr;
-        lastError = `AI generation failed: ${fetchErr?.message ?? 'network error'}`;
-        console.error('[ai] Gemini fetch error for', model, fetchErr);
-        continue;
-      }
-
-      if (!res.ok) {
-        const status = res.status;
-        const body = await res.text().catch(() => '');
-        // Short, human-readable reason (never raw JSON) for the UI.
-        let reason = `HTTP ${status}`;
-        try {
-          const parsed = JSON.parse(body);
-          if (parsed?.error?.message) reason = `HTTP ${status}: ${parsed.error.message}`;
-        } catch {
-          if (body) reason = `HTTP ${status}: ${body.slice(0, 200)}`;
-        }
-        console.error('[ai] Gemini non-OK response', model, status, body);
-        // 404 = model id not found — fall through to the next candidate.
-        if (status === 404) {
-          lastError = `AI request failed (${reason}).`;
-          continue;
-        }
-        // Auth/quota/server errors are unlikely to differ per model — surface now.
-        throw new Error(`AI request failed (${reason}).`);
-      }
-
-      const json = await res.json();
-      const raw: string = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  for (const modelName of GEMINI_MODELS) {
+    try {
+      console.log('[ai] Gemini request via SDK ->', modelName);
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
+      });
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const raw: string = response.text();
       const match = raw.match(/\[[\s\S]*\]/);
       if (!match) {
         console.error('[ai] Gemini returned no JSON array. Raw response:', raw);
         lastError = 'AI returned no usable cards. Try different notes or the offline engine.';
         continue;
       }
-
       const arr = JSON.parse(match[0]) as { front?: string; back?: string }[];
-      console.log('[ai] Gemini OK via', model, '->', arr.length, 'cards');
+      console.log('[ai] Gemini OK via', modelName, '->', arr.length, 'cards');
       return arr
         .filter((c) => c?.front && c?.back)
         .slice(0, max)
         .map((c) => ({ front: String(c.front).trim(), back: String(c.back).trim(), source: 'ai' as const }));
+    } catch (e: any) {
+      const msg = e?.message ?? String(e);
+      console.error('[ai] Gemini SDK error for', modelName, '-', msg);
+      // 404 / "not found" => model id unavailable; fall through to next candidate.
+      if (/404|not found|not supported/i.test(msg)) {
+        lastError = `AI request failed (${msg}).`;
+        continue;
+      }
+      // Auth / quota / network errors are unlikely to differ per model — surface now.
+      throw new Error(`AI generation failed: ${msg}`);
     }
-    throw new Error(lastError);
-  } catch (e: any) {
-    if (e?.name === 'AbortError') {
-      console.error('[ai] Gemini request timed out after 20s');
-      throw new Error('AI request timed out. Check your internet connection and retry.');
-    }
-    // Network failure or other — expose the real message so we can diagnose.
-    console.error('[ai] geminiGenerate failed:', e);
-    throw new Error(`AI generation failed: ${e?.message ?? 'unknown error'}`);
-  } finally {
-    clearTimeout(timer);
   }
+
+  throw new Error(lastError);
 }
