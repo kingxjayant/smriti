@@ -1,10 +1,10 @@
 name: Build Android APK
 
-# Builds a fully standalone (offline) APK on every push to main (and via manual
-# dispatch) and uploads it as a downloadable GitHub Actions artifact. The heavy
-# lifting — the actual Gradle/APK compilation — happens here on GitHub runners,
-# never locally. The JS bundle is pre-built and embedded so the APK needs no
-# Metro dev server.
+# Builds a fully standalone (offline) release APK on every push to main (and via
+# manual dispatch) and uploads it as a downloadable GitHub Actions artifact. The
+# heavy lifting — the actual Gradle/APK compilation — happens here on GitHub
+# runners, never locally. The JS bundle is pre-built and embedded so the APK
+# needs no Metro dev server.
 on:
   push:
     branches: [main]
@@ -53,11 +53,9 @@ jobs:
           EXPO_NO_TELEMETRY: "1"
           CI: "true"
 
-      # The Android Gradle plugin skips JS bundling for debuggable variants, so a
-      # plain `assembleDebug` ships without a JS bundle (red "Unable to load
-      # script" screen). Pre-bundle the JS + assets offline with Expo's embed
-      # command (the same one the plugin uses for release) so the APK is fully
-      # standalone and needs no Metro server.
+      # Offline JS/asset pre-bundle safety net (same command the Gradle plugin
+      # uses for release). The release build below also bundles, but this
+      # guarantees index.android.bundle is present in src/main/assets.
       - name: Bundle JS + assets offline (standalone APK)
         run: |
           mkdir -p android/app/src/main/assets
@@ -67,12 +65,20 @@ jobs:
           EXPO_NO_TELEMETRY: "1"
           CI: "true"
 
-      - name: Build debug APK
-        run: cd android && chmod +x ./gradlew && ./gradlew assembleDebug --no-daemon
+      # assembleRelease bundles AND signs the JS for a fully standalone APK. It
+      # signs with signingConfigs.debug (android/app/debug.keystore), which is
+      # only created when a debug build runs — so we build debug first to
+      # generate the keystore, then build the release APK.
+      - name: Build release APK
+        run: |
+          cd android
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: smriti-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: warn
