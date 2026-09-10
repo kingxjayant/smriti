@@ -161,11 +161,13 @@ export function localGenerate(text: string, max = 40): Draft[] {
   return out.slice(0, max);
 }
 
-// Models to try, in order, using exact IDs (no '-latest' suffix — that 404s on
-// this endpoint). The official @google/generative-ai SDK builds the correct
-// endpoint; we force apiVersion 'v1' via requestOptions and fall through the list
-// until one responds.
-const GEMINI_MODELS = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+// Active models available on the SDK's default v1beta endpoint. The retired
+// 'gemini-1.5-pro' / '-latest' / bare 'gemini-1.5-flash' ids 404 here, so we use
+// the 2.0/2.5 Flash family (and the small 1.5 Flash build) and fall through the
+// list on a 404. (Note: in @google/generative-ai@0.24.1 the GoogleGenerativeAI
+// constructor only takes the apiKey, and apiVersion in requestOptions does not
+// change the generateContent URL — so the working model id is what matters.)
+const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash-8b'];
 
 /**
  * Calls Gemini (via the official SDK) to turn notes into flashcards.
