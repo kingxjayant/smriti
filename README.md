@@ -36,7 +36,7 @@ That single number — *"you'll walk in remembering 74%"* — is the app's whole
 | 🧠 | **SM-2 derived SRS engine** tuned for exam cramming windows (shortened early intervals, 365-day cap) |
 | 📈 | **Exam Day Forecast** — forgetting-curve projection to your real exam date |
 | 📴 | **100% offline** — every card, every review, zero network calls. Built for patchy Indian data |
-| 🎴 | **3D flip review** with 4-point rating (Again / Hard / Good / Easy) |
+| 🎴 | **3D flip review** with 3-point rating (Review / Struggled / Mastered) |
 | ✍️ | **Notes → cards** — paste notes, get a deck. Runs **fully on-device**, no API key, no internet |
 | ✨ | **Optional AI mode** — bring your own free Gemini key for sharper cards from messy prose |
 | 📚 | **Pre-loaded decks** — Modern Physics, Chemical Bonding, Indian Polity, Human Physiology, Calculus |
